@@ -79,6 +79,28 @@ d = ms.robust_difference(other, soup)
 check("robust_difference: resta la soup", 0 < abs(d.volume) < 80**3,
       f"vol {abs(d.volume)/1000:.0f} cm3")
 
+# ---------- 2b. REPARACIÓN MANIFOLD: el caso real del Buddha ----------
+rep = ms.manifold_repair(soup)
+check("manifold_repair: soup reparada", rep is not None and rep.is_volume)
+check("manifold_repair: volumen exacto", rep is not None and abs(abs(rep.volume) - 80**3) < 1)
+ev = ms.ensure_volume(soup)
+check("ensure_volume: ahora repara la soup", ev.is_volume)
+
+# Modo suelto sobre PIEZAS SUCIAS (lo que fallaba 564 veces en el log real):
+A3 = trimesh.creation.box(extents=[100, 100, 100]); A3.apply_translation([0, 0, 50])
+A3s = trimesh.Trimesh(vertices=A3.triangles.reshape(-1, 3),
+                      faces=np.arange(len(A3.faces) * 3).reshape(-1, 3), process=False)
+B3 = trimesh.creation.box(extents=[100, 100, 100]); B3.apply_translation([0, 0, 150])
+B3s = trimesh.Trimesh(vertices=B3.triangles.reshape(-1, 3),
+                      faces=np.arange(len(B3.faces) * 3).reshape(-1, 3), process=False)
+check("Setup: piezas sucias no-volumen", not A3s.is_volume and not B3s.is_volume)
+na3, nb3, p3 = E.add_dowels_between(A3s, B3s, axis=2, position=100.0,
+                                    n_dowels=N, radius=R, height=H,
+                                    tolerance=TOL, loose=True)
+check("Suelto sobre sucias: N espigas", p3 == N, f"{p3}/{N}")
+check("Suelto sobre sucias: agujeros reales en A", abs(na3.volume) < 100**3 - 100)
+check("Suelto sobre sucias: agujeros reales en B", abs(nb3.volume) < 100**3 - 100)
+
 # ---------- 3. Espigas adheridas siguen funcionando (regresión) ----------
 A2 = trimesh.creation.box(extents=[100, 100, 100]); A2.apply_translation([0, 0, 50])
 B2 = trimesh.creation.box(extents=[100, 100, 100]); B2.apply_translation([0, 0, 150])

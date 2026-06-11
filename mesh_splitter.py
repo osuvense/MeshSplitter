@@ -111,9 +111,32 @@ def bboxes_touch(a, b, tol=1.0):
                b.bounds[0][k] <= a.bounds[1][k] + tol for k in range(3))
 
 
+def manifold_repair(mesh):
+    """Reparación profunda vía manifold3d: suelda vértices duplicados y
+    reconstruye un sólido manifold (lo que hace tragables las mallas STL
+    'sucias' reales). Devuelve la malla reparada o None si no se pudo."""
+    try:
+        import manifold3d as m3
+        mgl = m3.Mesh(vert_properties=np.asarray(mesh.vertices, dtype=np.float32),
+                      tri_verts=np.asarray(mesh.faces, dtype=np.uint32))
+        mgl.merge()
+        man = m3.Manifold(mgl)
+        if man.status() != m3.Error.NoError:
+            return None
+        out = man.to_mesh()
+        rep = trimesh.Trimesh(vertices=np.asarray(out.vert_properties)[:, :3],
+                              faces=np.asarray(out.tri_verts), process=False)
+        if rep.is_volume and len(rep.faces) > 0 and abs(rep.volume) > 1e-6:
+            return rep
+        return None
+    except Exception:
+        return None
+
+
 def ensure_volume(mesh):
-    """Reparación mínima para que las booleanas manifold acepten la malla
-    (exigen volúmenes cerrados). Si no se consigue, devuelve la original."""
+    """Reparación para que las booleanas manifold acepten la malla (exigen
+    volúmenes cerrados): primero arreglos ligeros de trimesh, después la
+    reconstrucción manifold. Si nada funciona, devuelve la original."""
     if getattr(mesh, "is_volume", False): return mesh
     m = mesh.copy()
     try:
@@ -124,8 +147,11 @@ def ensure_volume(mesh):
         trimesh.repair.fix_inversion(m)
         m.fill_holes()
     except Exception:
-        return mesh
-    return m if getattr(m, "is_volume", False) else mesh
+        m = None
+    if m is not None and getattr(m, "is_volume", False):
+        return m
+    rep = manifold_repair(mesh)
+    return rep if rep is not None else mesh
 
 
 def _robust_boolean(op, a, b):
@@ -910,6 +936,19 @@ class MeshSplitterApp(QMainWindow):
         try: mesh = trimesh.load(path, force="mesh")
         except Exception as e: QMessageBox.critical(self, "Error", str(e)); return
 
+        # STL reales muchas veces no son watertight: repararlos AQUÍ hace que
+        # cortes, fusiones y espigas trabajen sobre geometría limpia.
+        repair_note = ""
+        if not mesh.is_volume:
+            self.statusBar().showMessage("Malla no watertight: reparando…"); QApplication.processEvents()
+            rep = manifold_repair(mesh)
+            if rep is not None:
+                mesh = rep
+                repair_note = "\nMalla no watertight: REPARADA al cargar."
+            else:
+                repair_note = ("\nAVISO: malla no watertight y no reparable; "
+                               "fusiones y espigas pueden fallar en algunas piezas.")
+
         self.original_mesh = mesh; self.scaled_mesh = None; self.pieces = []; self.stl_path = path
         d = mesh.bounds[1] - mesh.bounds[0]
         ug, uh = guess_native_units(d)
@@ -918,7 +957,7 @@ class MeshSplitterApp(QMainWindow):
         self.lbl_mesh_info.setText(
             f"Triángulos: {len(mesh.faces):,}\n"
             f"Dims nativas: {d[0]:.4f} × {d[1]:.4f} × {d[2]:.4f}\n"
-            f"Unidades probables: {ug}\n{uh}")
+            f"Unidades probables: {ug}\n{uh}{repair_note}")
 
         mx = max(d)
         if mx < 5: self.scale_uniform.setValue(1000.0)
