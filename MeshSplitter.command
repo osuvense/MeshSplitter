@@ -20,8 +20,12 @@ if [ ! -d venv ]; then
 fi
 source venv/bin/activate
 
-if ! python -c "import PySide6, pyvista, pyvistaqt, trimesh, manifold3d, shapely" 2>/dev/null; then
-  echo "Instalando dependencias — VERÁS el progreso, VTK y PySide6 son pesados (3-10 min)…"
+if ! python -c "
+import PySide6, pyvista, pyvistaqt, trimesh, manifold3d, shapely
+v = tuple(map(int, PySide6.__version__.split('.')[:2]))
+assert v < (6, 10), 'PySide6 6.10+ cuelga con pyvistaqt en macOS'
+" 2>/dev/null; then
+  echo "Instalando/ajustando dependencias — VERÁS el progreso (puede tardar)…"
   pip install --upgrade pip
   pip install -r requirements.txt
 fi

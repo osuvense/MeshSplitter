@@ -1,4 +1,6 @@
-PySide6>=6.5
+# <6.10: pyvistaqt 0.11.3 cuelga con Qt 6.10 en macOS (render en paintEvent;
+# workaround aún sin release en pyvistaqt). Subir el pin cuando lo publiquen.
+PySide6>=6.5,<6.10
 pyvista>=0.43
 pyvistaqt>=0.11
 trimesh>=4.0
