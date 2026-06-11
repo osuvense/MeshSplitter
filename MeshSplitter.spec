@@ -42,7 +42,7 @@ if sys.platform == "darwin":
         debug=False, strip=False, upx=False,
         console=False,
         target_arch=None,          # nativo (arm64 en Apple Silicon)
-        codesign_identity=None,    # sin firma: clic derecho → Abrir la 1ª vez
+        codesign_identity=None,    # sin firma: 1ª vez → Ajustes → Privacidad y seguridad → Abrir de todos modos
         entitlements_file=None,
     )
     coll = COLLECT(exe, a.binaries, a.datas, strip=False, upx=False, name="MeshSplitter")

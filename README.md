@@ -29,7 +29,7 @@ En [Releases](../../releases) hay binarios listos para usar:
 
 | Plataforma | Archivo | Nota |
 |---|---|---|
-| **macOS** (Apple Silicon) | `MeshSplitter-x.y.z-macOS.dmg` | Sin firmar: la **primera** vez, clic derecho sobre la app → **Abrir** |
+| **macOS** (Apple Silicon) | `MeshSplitter-x.y.z-macOS.dmg` | Sin firmar: la **primera** vez macOS la bloqueará. Intenta abrirla, cierra el aviso, y ve a **Ajustes del Sistema → Privacidad y seguridad** → baja hasta **"Abrir de todos modos"** y confirma. Solo hace falta una vez |
 | **Windows** 10/11 | `MeshSplitter-x.y.z-Windows-portable.exe` | Portable, sin instalación. Si SmartScreen avisa: **Más información → Ejecutar de todas formas**. El primer arranque tarda unos segundos (se descomprime en temporal) |
 
 Los avisos de macOS/Windows aparecen porque los binarios no están firmados con certificado de pago, no porque haya nada raro: el código es abierto y los binarios los construye GitHub Actions directamente desde este repositorio (puedes ver cada build en la pestaña Actions).

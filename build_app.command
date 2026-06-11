@@ -30,5 +30,6 @@ echo
 echo "Hecho:"
 echo "  dist/MeshSplitter.app"
 echo "  dist/MeshSplitter-${VERSION}-macOS.dmg"
-echo "Al no estar firmada, la PRIMERA vez se abre con clic derecho → Abrir."
+echo "Al no estar firmada, la PRIMERA vez macOS la bloqueará:"
+echo "Ajustes del Sistema → Privacidad y seguridad → 'Abrir de todos modos'."
 open dist
