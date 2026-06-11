@@ -137,7 +137,11 @@ def pymeshfix_repair(mesh):
     """Reparación profunda con MeshFix (cierra agujeros reales, elimina
     self-intersections y aristas non-manifold). pymeshfix es GPL v3, así que
     NO se incluye en requirements ni en los binarios: es un extra opcional
-    (`pip install pymeshfix` en el venv). Devuelve malla reparada o None."""
+    (`pip install pymeshfix` en el venv). Devuelve malla reparada o None.
+
+    IMPORTANTE: remove_smallest_components=False — el default de MeshFix
+    DESCARTA todos los componentes salvo el mayor (se comió el cuerpo de un
+    kitbash dejando solo la cabeza, caso real 11/06/2026)."""
     try:
         import pymeshfix
     except ImportError:
@@ -145,7 +149,7 @@ def pymeshfix_repair(mesh):
     try:
         mf = pymeshfix.MeshFix(np.asarray(mesh.vertices, dtype=float),
                                np.asarray(mesh.faces, dtype=np.int32))
-        mf.repair()
+        mf.repair(joincomp=True, remove_smallest_components=False)
         rep = trimesh.Trimesh(vertices=np.asarray(mf.points),
                               faces=np.asarray(mf.faces), process=False)
         if rep.is_volume and len(rep.faces) > 0 and abs(rep.volume) > 1e-6:
@@ -155,10 +159,8 @@ def pymeshfix_repair(mesh):
         return None
 
 
-def deep_repair(mesh):
-    """Escalera de reparación: manifold merge (vértices desoldados) →
-    MeshFix si está instalado (agujeros y defectos serios).
-    Devuelve (malla_reparada, nombre_del_método) o (None, None)."""
+def _repair_single(mesh):
+    """Escalera sobre UN componente: manifold merge → MeshFix."""
     rep = manifold_repair(mesh)
     if rep is not None:
         return rep, "manifold"
@@ -166,6 +168,54 @@ def deep_repair(mesh):
     if rep is not None:
         return rep, "MeshFix"
     return None, None
+
+
+def deep_repair(mesh):
+    """Reparación consciente de kitbash: separa los componentes conectados,
+    repara cada uno por su lado y los UNE con booleana real (dos cuerpos
+    solapados pasan a ser un sólido). Así ningún componente se descarta.
+    Devuelve (malla_reparada, descripción_del_método) o (None, None)."""
+    # Soldar vértices ANTES de separar: una malla con caras desoldadas parece
+    # tener miles de "componentes" (uno por triángulo) cuando en realidad es uno.
+    base = mesh.copy()
+    try:
+        base.merge_vertices()
+    except Exception:
+        pass
+    comps = [c for c in split_connected_components(base)
+             if not is_degenerate_sliver(c)]
+    if not comps:
+        return None, None
+    if len(comps) == 1:
+        return _repair_single(comps[0])
+    if len(comps) > 50:
+        # demasiados para unión incremental: reparación global conservando todo
+        rep = pymeshfix_repair(base)
+        return (rep, f"MeshFix global ({len(comps)} comps)") if rep is not None else (None, None)
+
+    repaired, methods, raw = [], set(), 0
+    for c in comps:
+        r, met = _repair_single(c)
+        if r is None:
+            r, met = c, None      # irreparable: conservarlo crudo antes que perderlo
+            raw += 1
+        else:
+            methods.add(met)
+        repaired.append(r)
+
+    result = repaired[0]
+    for r in repaired[1:]:
+        try:
+            result = robust_union(result, r)
+        except Exception:
+            result = trimesh.util.concatenate([result, r])
+
+    label = f"{len(comps)} componentes unidos ({'+'.join(sorted(methods)) or 'sin reparar'}"
+    label += f", {raw} sin reparar)" if raw else ")"
+    if result.is_volume:
+        return result, label
+    # unión imperfecta: devolverla solo si al menos conserva todo
+    return (result, label + " — imperfecta") if len(result.faces) > 0 else (None, None)
 
 
 def ensure_volume(mesh):

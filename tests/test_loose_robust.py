@@ -120,6 +120,29 @@ if HAS_MESHFIX:
 else:
     print("[SKIP] pymeshfix no instalado: deep_repair con boquetes no validable aquí")
 
+# ---------- 2d. KITBASH: multi-componente NO se descarta (caso real) ----------
+if HAS_MESHFIX:
+    s1 = trimesh.creation.icosphere(subdivisions=3, radius=50)            # "cuerpo"
+    s2 = trimesh.creation.icosphere(subdivisions=3, radius=30)            # "cabeza"
+    s2.apply_translation([0, 0, 60])                                       # solapadas
+    holed1 = trimesh.Trimesh(vertices=s1.vertices, faces=s1.faces[60:], process=False)
+    soup2 = trimesh.Trimesh(vertices=s2.triangles.reshape(-1, 3),
+                            faces=np.arange(len(s2.faces)*3).reshape(-1, 3), process=False)
+    kitbash = trimesh.util.concatenate([holed1, soup2])
+    check("Setup kitbash: 2 componentes, no-volumen",
+          kitbash.body_count >= 2 and not kitbash.is_volume)
+    v_cuerpo = 4/3*np.pi*50**3 / 1000   # 523.6 cm3
+    rk, mk = ms.deep_repair(kitbash)
+    check("Kitbash: reparado", rk is not None, f"método: {mk}")
+    if rk is not None:
+        print(f"[i ] Kitbash: body_count={rk.body_count} (1=soldado; >1=compuesto válido), is_volume={rk.is_volume}")
+    check("Kitbash: resultado es volumen operable", rk is not None and rk.is_volume)
+    check("Kitbash: el cuerpo NO se descartó", rk is not None and
+          abs(rk.volume)/1000 > v_cuerpo,
+          f"{abs(rk.volume)/1000:.0f} cm3 > cuerpo solo {v_cuerpo:.0f} cm3")
+else:
+    print("[SKIP] kitbash requiere pymeshfix")
+
 # ---------- 3. Espigas adheridas siguen funcionando (regresión) ----------
 A2 = trimesh.creation.box(extents=[100, 100, 100]); A2.apply_translation([0, 0, 50])
 B2 = trimesh.creation.box(extents=[100, 100, 100]); B2.apply_translation([0, 0, 150])
