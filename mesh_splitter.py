@@ -627,7 +627,11 @@ class MeshSplitterApp(QMainWindow):
         central = QWidget(); self.setCentralWidget(central)
         ml = QHBoxLayout(central); ml.setContentsMargins(6,6,6,6)
 
-        ls = QScrollArea(); ls.setWidgetResizable(True); ls.setFixedWidth(370)
+        # Panel lateral: ancho ajustable vía splitter (antes fijo a 370 px, que
+        # con las métricas de Qt 6 quedaba corto y forzaba scroll horizontal)
+        ls = QScrollArea(); ls.setWidgetResizable(True)
+        ls.setMinimumWidth(340)
+        ls.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         lw = QWidget(); self.left_layout = QVBoxLayout(lw); self.left_layout.setAlignment(Qt.AlignTop)
         ls.setWidget(lw)
 
@@ -659,7 +663,13 @@ class MeshSplitterApp(QMainWindow):
         tc = QWidget(); tcl = QVBoxLayout(tc); tcl.setContentsMargins(0,0,0,0)
         tcl.addWidget(vw); tcl.addWidget(self.table)
         rs.addWidget(tc); rs.setSizes([600,300])
-        ml.addWidget(ls); ml.addWidget(rs, 1)
+
+        hs = QSplitter(Qt.Horizontal)
+        hs.addWidget(ls); hs.addWidget(rs)
+        hs.setStretchFactor(0, 0)   # el panel mantiene su ancho al redimensionar
+        hs.setStretchFactor(1, 1)   # el viewport absorbe el espacio extra
+        hs.setSizes([420, 1000])
+        ml.addWidget(hs)
 
     def _build_file_group(self):
         g = QGroupBox("Archivo"); l = QVBoxLayout(g)
