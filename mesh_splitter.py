@@ -128,6 +128,34 @@ def ensure_volume(mesh):
     return m if getattr(m, "is_volume", False) else mesh
 
 
+def _robust_boolean(op, a, b):
+    """Booleana manifold en escalera: estricta → reparar y reintentar →
+    sin pre-check (manifold tolera defectos menores). El resultado del último
+    escalón se valida: si sale vacío, se lanza (el caller decide/avisa) en vez
+    de devolver una pieza fantasma."""
+    try:
+        return op([a, b], engine="manifold")
+    except Exception:
+        pass
+    a2, b2 = ensure_volume(a), ensure_volume(b)
+    try:
+        return op([a2, b2], engine="manifold")
+    except Exception:
+        pass
+    r = op([a2, b2], engine="manifold", check_volume=False)
+    if r is None or len(r.faces) == 0 or abs(getattr(r, "volume", 0.0)) < 1e-6:
+        raise ValueError("resultado booleano vacío (malla irreparable)")
+    return r
+
+
+def robust_union(a, b):
+    return _robust_boolean(trimesh.boolean.union, a, b)
+
+
+def robust_difference(a, b):
+    return _robust_boolean(trimesh.boolean.difference, a, b)
+
+
 def is_degenerate_sliver(piece, thickness_mm=0.2, volume_mm3=1.0):
     """Esquirla de ruido numérico del corte: espesor ~0 y volumen ~0.
     No es geometría real (no es un dedo ni una nariz): se puede descartar."""
@@ -337,7 +365,7 @@ class CuttingEngine:
             sp_v = ensure_volume(sp)
             for _, _, j in cands:
                 try:
-                    u = trimesh.boolean.union([ensure_volume(pieces[j]), sp_v], engine="manifold")
+                    u = robust_union(ensure_volume(pieces[j]), sp_v)
                 except Exception as e:
                     print(f"  AVISO Fusión fallida con vecina {j}: {e}")
                     continue
@@ -389,7 +417,9 @@ class CuttingEngine:
         try:
             sec = piece.section(plane_origin=origin, plane_normal=normal)
             if sec is None: return None
-            p2d, _ = sec.to_planar(to_2D=to_2d)
+            # trimesh ≥4.x renombró to_planar → to_2D (mismo kwarg)
+            conv = getattr(sec, "to_2D", None) or sec.to_planar
+            p2d, _ = conv(to_2D=to_2d)
             polys = [p for p in p2d.polygons_full if p is not None]
             if not polys: return None
             poly = unary_union([sg.Polygon(p.exterior, p.interiors).buffer(0) for p in polys])
@@ -458,15 +488,16 @@ class CuttingEngine:
 
     @staticmethod
     def add_dowels_between(piece_a, piece_b, axis, position,
-                           n_dowels, radius, height, tolerance, section_offset=0.5):
+                           n_dowels, radius, height, tolerance,
+                           section_offset=0.5, loose=False):
         """Espigas SOLO dentro de la zona de contacto real entre ambas piezas.
 
-        - La zona se calcula seccionando las dos piezas junto al plano e
-          intersecándolas (antes: anillo ciego alrededor del centroide, que en
-          secciones irregulares caía fuera del material → pinchos absurdos).
-        - El pin va EMBEBIDO en A (penetra embed mm) para soldarse de verdad,
-          no tangente a la cara.
-        - Unión verificada por body_count (un solo cuerpo = soldadura real).
+        Dos modos:
+        - loose=False (adheridas): pin embebido en A sobresaliendo hacia B,
+          agujero en B. Unión verificada por body_count.
+        - loose=True (sueltas): agujero en AMBAS caras (profundidad height/2
+          + holgura); las espigas se imprimen aparte (export genera su STL).
+          Ventaja: ninguna pieza tiene salientes → impresión sin soportes.
         Devuelve (piece_a, piece_b, n_colocadas)."""
         if n_dowels <= 0: return piece_a, piece_b, 0
 
@@ -482,20 +513,43 @@ class CuttingEngine:
         if not points:
             return piece_a, piece_b, 0
 
-        embed = max(5.0, section_offset + 2.0)   # penetración del pin en A
+        embed = max(5.0, section_offset + 2.0)   # penetración del pin en A (modo adherido)
         to_3d = np.linalg.inv(to_2d)
         placed = 0
+        half = height / 2.0
 
         for pt in points:
             p3 = (to_3d @ np.array([pt.x, pt.y, 0.0, 1.0]))[:3]
 
-            # ── Espiga: de position-embed a position+height ──
+            if loose:
+                # ── Agujero en A: de position-(half+0.5) a position+0.5 ──
+                hole_a = CuttingEngine._axis_cylinder(radius + tolerance, half + 1.0, axis)
+                ca = p3.copy(); ca[axis] = position - half / 2.0
+                hole_a.apply_translation(ca)
+                # ── Agujero en B: de position-0.5 a position+(half+0.5) ──
+                hole_b = CuttingEngine._axis_cylinder(radius + tolerance, half + 1.0, axis)
+                cb = p3.copy(); cb[axis] = position + half / 2.0
+                hole_b.apply_translation(cb)
+                try:
+                    va = abs(piece_a.volume)
+                    new_a = robust_difference(piece_a, hole_a)
+                    new_b = robust_difference(piece_b, hole_b)
+                    if abs(new_a.volume) >= va:   # el agujero no restó nada
+                        print(f"  AVISO Agujero sin efecto en {np.round(p3,1)}, descartado")
+                        continue
+                    piece_a, piece_b = new_a, new_b
+                    placed += 1
+                except Exception as e:
+                    print(f"  AVISO Agujeros (modo suelto): {e}")
+                continue
+
+            # ── Modo adherido: pin de position-embed a position+height ──
             pin = CuttingEngine._axis_cylinder(radius, height + embed, axis)
             center = p3.copy(); center[axis] = position + (height - embed) / 2.0
             pin.apply_translation(center)
             try:
                 bodies_before = piece_a.body_count
-                result = trimesh.boolean.union([piece_a, pin], engine="manifold")
+                result = robust_union(piece_a, pin)
                 if result.body_count > bodies_before:
                     print(f"  AVISO Espiga en {np.round(p3,1)}: sin soldadura real, descartada")
                     continue
@@ -509,7 +563,7 @@ class CuttingEngine:
             center_h = p3.copy(); center_h[axis] = position + (height - embed + 0.5) / 2.0
             hole.apply_translation(center_h)
             try:
-                piece_b = trimesh.boolean.difference([piece_b, hole], engine="manifold")
+                piece_b = robust_difference(piece_b, hole)
                 placed += 1
             except Exception as e:
                 print(f"  AVISO Agujero: {e}")
@@ -760,6 +814,17 @@ class MeshSplitterApp(QMainWindow):
         g = QGroupBox("Espigas"); l = QVBoxLayout(g)
         self.chk_dowels = QCheckBox("Generar espigas y agujeros"); l.addWidget(self.chk_dowels)
         self.dowels_container = QWidget(); dl = QVBoxLayout(self.dowels_container); dl.setContentsMargins(0,0,0,0)
+
+        rm = QHBoxLayout(); rm.addWidget(QLabel("Modo:"))
+        self.dowel_mode = QComboBox()
+        self.dowel_mode.addItem("Sueltas: agujeros + espigas aparte", userData=True)
+        self.dowel_mode.addItem("Adheridas a la pieza", userData=False)
+        self.dowel_mode.setToolTip(
+            "Sueltas: agujero en ambas caras y un STL de espiga para imprimir\n"
+            "aparte (N copias, ver informe). Ninguna pieza tiene salientes →\n"
+            "impresión sin soportes. Recomendado.\n\n"
+            "Adheridas: la espiga sobresale de una pieza y encaja en la otra.")
+        rm.addWidget(self.dowel_mode, 1); dl.addLayout(rm)
         for lt,attr,dv,mn,mx,st,sf in [
             ("Cantidad/junta:","dowel_count",3,1,8,1,""),
             ("Radio (mm):","dowel_radius",5.0,1,20,0.5," mm"),
@@ -947,9 +1012,11 @@ class MeshSplitterApp(QMainWindow):
             self.lbl_merge_info.setText(txt)
 
         self._dowel_summary = ""
+        self._dowel_export = None
         if with_dowels and self.chk_dowels.isChecked() and len(pieces) > 1:
             self.statusBar().showMessage("Espigas…"); QApplication.processEvents()
             irreg = self.irreg_slider.value() / 10.0
+            loose = bool(self.dowel_mode.currentData())
             adjs = CuttingEngine.find_adjacencies(pieces, cuts, tolerance=max(5.0, irreg + 1.0))
             n,r,h,t = self.dowel_count.value(), self.dowel_radius.value(), self.dowel_height.value(), self.dowel_tol.value()
             total_pins = 0; no_room = 0
@@ -958,10 +1025,13 @@ class MeshSplitterApp(QMainWindow):
                     self.statusBar().showMessage(f"Espigas {ai+1}/{len(adjs)}…"); QApplication.processEvents()
                     pieces[ia], pieces[ib], placed = CuttingEngine.add_dowels_between(
                         pieces[ia], pieces[ib], ax, po, n, r, h, t,
-                        section_offset=max(0.5, irreg + 0.5))
+                        section_offset=max(0.5, irreg + 0.5), loose=loose)
                     total_pins += placed
                     if placed == 0: no_room += 1
-            self._dowel_summary = f" Espigas: {total_pins} en {len(adjs)-no_room}/{len(adjs)} juntas."
+            modo = "sueltas" if loose else "adheridas"
+            self._dowel_summary = f" Espigas ({modo}): {total_pins} en {len(adjs)-no_room}/{len(adjs)} juntas."
+            if loose and total_pins > 0:
+                self._dowel_export = {"count": total_pins, "radius": r, "height": h}
 
         self.pieces = pieces
         wp = self._weight_params()
@@ -1030,8 +1100,22 @@ class MeshSplitterApp(QMainWindow):
                          f"{notes:<20} {fn:<40}")
         total = sum(i.weight_g for i in self.piece_infos)
         lines += ["-"*120, f"TOTAL estimado: {smart_weight_str(total)} de {mat}"]
+
+        # ── Espigas sueltas: STL único + instrucciones ──
+        de = getattr(self, "_dowel_export", None)
+        if de:
+            pin_fn = f"{bn}_espiga.stl"
+            pin = trimesh.creation.cylinder(radius=de["radius"], height=de["height"], sections=32)
+            pin.export(os.path.join(od, pin_fn))
+            lines += ["",
+                      f"ESPIGAS SUELTAS: imprime {de['count']} copias de {pin_fn}",
+                      f"  (cilindro de {de['radius']*2:.1f} mm de diámetro × {de['height']:.1f} mm de largo;",
+                      f"   cada espiga entra hasta la mitad en el agujero de cada pieza)"]
         with open(os.path.join(od, f"{bn}_informe.txt"), "w", encoding="utf-8") as f: f.write("\n".join(lines))
-        QMessageBox.information(self, "OK", f"{len(exp)} STLs + informe en:\n{od}")
+        msg = f"{len(exp)} STLs + informe en:\n{od}"
+        if de:
+            msg += f"\n\nEspigas sueltas: imprime {de['count']} copias de {bn}_espiga.stl (ver informe)."
+        QMessageBox.information(self, "OK", msg)
 
     def _refresh_cut_planes(self):
         """Pinta los planos de corte como superficies semitransparentes sobre el

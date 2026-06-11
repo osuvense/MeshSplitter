@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.0-beta — 2026-06-11 (revisión final de la beta)
+
+- **Espigas en dos modos:** sueltas (agujeros en ambas caras + STL de espiga para imprimir N copias aparte — sin salientes en las piezas, impresión sin soportes; recomendado y por defecto) o adheridas a la pieza.
+- **Booleanas robustas para STL reales no-watertight:** escalera estricta → reparación → manifold sin pre-check con validación de resultado. Elimina la gran mayoría de los fallos "Not all meshes are volumes" con mallas sucias.
+- Panel lateral redimensionable (splitter) — adiós a la barra de scroll horizontal fija.
+- Silenciados ~7.000 avisos de deprecación de trimesh (`to_planar` → `to_2D`).
+- Aviso de beta sin validación física en README.
+
 ## 0.9.0-beta — 2026-06-10
 
 Primera versión pública (beta). Consolida siete iteraciones internas de desarrollo (v1–v7, marzo–junio 2026).

@@ -16,3 +16,4 @@ dist/
 # modelos y salidas de prueba (pesados)
 *.stl
 *_informe.txt
+log.md

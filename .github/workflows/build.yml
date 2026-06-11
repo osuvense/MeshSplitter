@@ -26,6 +26,7 @@ jobs:
           python tests/test_engine.py
           python tests/test_fixes.py
           python tests/test_triplicado.py
+          python tests/test_loose_robust.py
       - name: GUI smoke test (offscreen)
         run: python tests/smoke_gui.py
       - name: Build .app
@@ -59,6 +60,7 @@ jobs:
           python tests/test_engine.py
           python tests/test_fixes.py
           python tests/test_triplicado.py
+          python tests/test_loose_robust.py
       - name: GUI smoke test (offscreen)
         run: python tests/smoke_gui.py
       - name: Build portable .exe

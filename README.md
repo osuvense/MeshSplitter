@@ -2,6 +2,10 @@
 
 **Corta modelos STL grandes en bloques imprimibles, con espigas de alineación y cortes de aspecto natural.**
 
+> ⚠️ **BETA EN PRUEBAS — úsala bajo tu propia responsabilidad.** Esta herramienta es nueva y **todavía nadie ha impreso y ensamblado una pieza real cortada con ella** (está en ello el autor). La geometría generada pasa tests automáticos, pero hasta que haya validación física: revisa SIEMPRE los STL exportados en tu slicer antes de imprimir, empieza con algo pequeño y barato, y cuéntanos cómo fue. El feedback es exactamente el objetivo de esta beta.
+
+![MeshSplitter cortando un modelo de 2,6 m en 322 piezas](docs/screenshot.png)
+
 Pensado para imprimir esculturas y modelos a gran escala en impresoras FDM domésticas (desarrollado sobre Bambu Lab H2D y X1C, válido para cualquier impresora). Cargas un STL — incluso de varios metros, como los que generan las IAs de mesh tipo Hunyuan — lo escalas, lo partes en bloques que quepan en tu cama, y exportas cada pieza como STL individual con su informe de dimensiones y peso.
 
 > 🇬🇧 *English: desktop tool to split large STL models into printable blocks, with alignment dowel pins, natural-looking cut surfaces (stone effect), per-piece weight estimation and individual STL export. UI currently in Spanish — English version on the roadmap if there's interest. See [Quick start](#english-quick-start).*
@@ -11,7 +15,7 @@ Pensado para imprimir esculturas y modelos a gran escala en impresoras FDM domé
 ## Características
 
 - **Corte en 3 ejes** con planos manuales o generados automáticamente según el tamaño máximo de pieza (presets para volúmenes *prácticos* de Bambu Lab H2D 315³ y X1C 245³ — los reales, no los de marketing).
-- **Espigas de alineación (dowel pins)**: cada junta recibe espigas y agujeros con tolerancia configurable, colocadas automáticamente dentro de la zona de contacto real entre piezas (funciona con piezas huecas: nunca caen en el vacío).
+- **Espigas de alineación (dowel pins)** colocadas automáticamente dentro de la zona de contacto real entre piezas (funciona con piezas huecas: nunca caen en el vacío). Dos modos: **sueltas** (agujeros en ambas caras + un STL de espiga para imprimir N copias aparte — ninguna pieza tiene salientes, impresión sin soportes; recomendado) o **adheridas** (la espiga sobresale de una pieza y encaja en la otra).
 - **Irregularidad de corte**: ondulación configurable de las superficies de corte para un acabado tipo piedra/megalítico; las caras enfrentadas usan el mismo mapa de ruido y encajan.
 - **Fusión inteligente de piezas pequeñas**: los fragmentos finos (dedos, salientes) se fusionan con su vecina en contacto físico verificado, nunca se pierden. Lo que no toca nada se marca para decisión humana.
 - **Peso estimado por pieza** según material (PLA/PETG/ABS/ASA/TPU/PC), % de relleno y espesor de pared, con total del proyecto. Volumen real de malla, no bounding box.
