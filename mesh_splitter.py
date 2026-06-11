@@ -133,10 +133,45 @@ def manifold_repair(mesh):
         return None
 
 
+def pymeshfix_repair(mesh):
+    """Reparación profunda con MeshFix (cierra agujeros reales, elimina
+    self-intersections y aristas non-manifold). pymeshfix es GPL v3, así que
+    NO se incluye en requirements ni en los binarios: es un extra opcional
+    (`pip install pymeshfix` en el venv). Devuelve malla reparada o None."""
+    try:
+        import pymeshfix
+    except ImportError:
+        return None
+    try:
+        mf = pymeshfix.MeshFix(np.asarray(mesh.vertices, dtype=float),
+                               np.asarray(mesh.faces, dtype=np.int32))
+        mf.repair()
+        rep = trimesh.Trimesh(vertices=np.asarray(mf.points),
+                              faces=np.asarray(mf.faces), process=False)
+        if rep.is_volume and len(rep.faces) > 0 and abs(rep.volume) > 1e-6:
+            return rep
+        return None
+    except Exception:
+        return None
+
+
+def deep_repair(mesh):
+    """Escalera de reparación: manifold merge (vértices desoldados) →
+    MeshFix si está instalado (agujeros y defectos serios).
+    Devuelve (malla_reparada, nombre_del_método) o (None, None)."""
+    rep = manifold_repair(mesh)
+    if rep is not None:
+        return rep, "manifold"
+    rep = pymeshfix_repair(mesh)
+    if rep is not None:
+        return rep, "MeshFix"
+    return None, None
+
+
 def ensure_volume(mesh):
     """Reparación para que las booleanas manifold acepten la malla (exigen
     volúmenes cerrados): primero arreglos ligeros de trimesh, después la
-    reconstrucción manifold. Si nada funciona, devuelve la original."""
+    reparación profunda. Si nada funciona, devuelve la original."""
     if getattr(mesh, "is_volume", False): return mesh
     m = mesh.copy()
     try:
@@ -150,7 +185,7 @@ def ensure_volume(mesh):
         m = None
     if m is not None and getattr(m, "is_volume", False):
         return m
-    rep = manifold_repair(mesh)
+    rep, _ = deep_repair(mesh)
     return rep if rep is not None else mesh
 
 
@@ -941,13 +976,18 @@ class MeshSplitterApp(QMainWindow):
         repair_note = ""
         if not mesh.is_volume:
             self.statusBar().showMessage("Malla no watertight: reparando…"); QApplication.processEvents()
-            rep = manifold_repair(mesh)
+            rep, method = deep_repair(mesh)
             if rep is not None:
                 mesh = rep
-                repair_note = "\nMalla no watertight: REPARADA al cargar."
+                repair_note = f"\nMalla no watertight: REPARADA al cargar ({method})."
             else:
-                repair_note = ("\nAVISO: malla no watertight y no reparable; "
-                               "fusiones y espigas pueden fallar en algunas piezas.")
+                try:
+                    import pymeshfix  # noqa: F401
+                    hint = "no se pudo reparar automáticamente; repárala en Bambu Studio / Meshmixer."
+                except ImportError:
+                    hint = ("instala el reparador opcional (pip install pymeshfix "
+                            "en el venv) o repárala en Bambu Studio / Meshmixer.")
+                repair_note = f"\nAVISO: malla no watertight; {hint}"
 
         self.original_mesh = mesh; self.scaled_mesh = None; self.pieces = []; self.stl_path = path
         d = mesh.bounds[1] - mesh.bounds[0]

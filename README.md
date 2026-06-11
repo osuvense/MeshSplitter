@@ -63,6 +63,15 @@ python mesh_splitter.py
 
 En macOS también puedes usar `MeshSplitter.command` (doble clic: crea el venv y lanza) y `build_app.command` (construye la .app y el .dmg localmente).
 
+## STL rotos (no watertight)
+
+Muchos STL reales no son sólidos cerrados. MeshSplitter intenta repararlos **automáticamente al cargar** (verás "REPARADA al cargar" en el panel). El reparador integrado resuelve vértices desoldados; para defectos serios (agujeros en la superficie, aristas non-manifold) hay dos caminos:
+
+1. **Instalar el reparador opcional** (solo si ejecutas desde código): `venv/bin/pip install pymeshfix` — cierra agujeros y elimina self-intersections. No viene incluido porque su licencia (GPL v3) es incompatible con distribuirlo dentro de esta app MIT.
+2. **Reparar antes de cargar** con tu herramienta habitual: Bambu Studio u Orca (importar → reparar → exportar STL), Meshmixer, etc.
+
+Si la malla no se puede reparar, la app lo avisa: el corte funcionará, pero fusiones y espigas pueden fallar en algunas piezas.
+
 ## Limitaciones conocidas
 
 - Mallas muy densas (>1M triángulos): el corte va rápido (~15 s para 1,3M), pero las operaciones booleanas de espigas en muchas juntas pueden tardar varios minutos. Si es excesivo, decima antes el STL (Blender, Decimate ~0.3-0.5).

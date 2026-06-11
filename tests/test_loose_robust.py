@@ -101,6 +101,25 @@ check("Suelto sobre sucias: N espigas", p3 == N, f"{p3}/{N}")
 check("Suelto sobre sucias: agujeros reales en A", abs(na3.volume) < 100**3 - 100)
 check("Suelto sobre sucias: agujeros reales en B", abs(nb3.volume) < 100**3 - 100)
 
+# ---------- 2c. REPARACIÓN PROFUNDA con boquete real (perfil Buddha) ----------
+sph = trimesh.creation.icosphere(subdivisions=4, radius=50)
+holed = trimesh.Trimesh(vertices=sph.vertices, faces=sph.faces[200:], process=False)
+check("Setup: boquete real no-volumen", not holed.is_volume)
+check("manifold_repair NO puede con boquetes", ms.manifold_repair(holed) is None)
+try:
+    import pymeshfix  # noqa: F401
+    HAS_MESHFIX = True
+except ImportError:
+    HAS_MESHFIX = False
+if HAS_MESHFIX:
+    repd, method = ms.deep_repair(holed)
+    check("deep_repair cierra el boquete (MeshFix)", repd is not None and repd.is_volume,
+          f"método={method}")
+    check("deep_repair: volumen ~esfera", repd is not None and
+          abs(abs(repd.volume)/1000 - 523.6) < 15, f"{abs(repd.volume)/1000:.1f} cm3")
+else:
+    print("[SKIP] pymeshfix no instalado: deep_repair con boquetes no validable aquí")
+
 # ---------- 3. Espigas adheridas siguen funcionando (regresión) ----------
 A2 = trimesh.creation.box(extents=[100, 100, 100]); A2.apply_translation([0, 0, 50])
 B2 = trimesh.creation.box(extents=[100, 100, 100]); B2.apply_translation([0, 0, 150])
