@@ -13,7 +13,7 @@ source venv/bin/activate
 
 echo "Instalando dependencias (la primera vez tarda: VTK es pesado)…"
 pip install --upgrade pip --quiet
-pip install -r requirements.txt --quiet
+pip install --no-compile -r requirements.txt --quiet
 pip install pyinstaller --quiet
 
 echo "Smoke test de la GUI…"
