@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Tests headless del engine de MeshSplitter v7 (sin GUI).
 Stubs para PyQt5/pyvista/pyvistaqt; trimesh/numpy/scipy reales."""
-import sys, time, types
+import os, sys, time, types
 
 # ---- Stubs de módulos GUI ----
 class _FakeMeta(type):
