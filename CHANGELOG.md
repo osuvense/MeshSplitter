@@ -7,6 +7,7 @@
 - Panel lateral redimensionable (splitter) — adiós a la barra de scroll horizontal fija.
 - Silenciados ~7.000 avisos de deprecación de trimesh (`to_planar` → `to_2D`).
 - Aviso de beta sin validación física en README.
+- **Detección de STL no-watertight al cargar**, con aviso claro recomendando repararlos en una herramienta externa (Bambu Studio/Orca, Meshmixer…). Reparar mallas queda explícitamente fuera del alcance de la app (decisión de diseño: evita resultados sorpresa y dependencias GPL).
 
 ## 0.9.0-beta — 2026-06-10
 

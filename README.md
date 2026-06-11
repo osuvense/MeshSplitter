@@ -65,12 +65,7 @@ En macOS también puedes usar `MeshSplitter.command` (doble clic: crea el venv y
 
 ## STL rotos (no watertight)
 
-Muchos STL reales no son sólidos cerrados. MeshSplitter intenta repararlos **automáticamente al cargar** (verás "REPARADA al cargar" en el panel). El reparador integrado resuelve vértices desoldados; para defectos serios (agujeros en la superficie, aristas non-manifold) hay dos caminos:
-
-1. **Instalar el reparador opcional** (solo si ejecutas desde código): `venv/bin/pip install pymeshfix` — cierra agujeros y elimina self-intersections. No viene incluido porque su licencia (GPL v3) es incompatible con distribuirlo dentro de esta app MIT.
-2. **Reparar antes de cargar** con tu herramienta habitual: Bambu Studio u Orca (importar → reparar → exportar STL), Meshmixer, etc.
-
-Si la malla no se puede reparar, la app lo avisa: el corte funcionará, pero fusiones y espigas pueden fallar en algunas piezas.
+Reparar mallas **no es competencia de esta app**: si el STL que cargas no es un sólido cerrado, MeshSplitter te lo avisa con claridad y te recomienda repararlo primero en una herramienta externa — Bambu Studio u OrcaSlicer (importar → reparar → exportar STL), Meshmixer, Blender, Windows 3D Builder… — y cargar el archivo reparado. Puedes continuar sin reparar bajo tu responsabilidad: el corte funcionará, pero la fusión de piezas pequeñas y las espigas pueden fallar donde la geometría esté rota.
 
 ## Limitaciones conocidas
 

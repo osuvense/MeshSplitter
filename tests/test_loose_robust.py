@@ -101,47 +101,12 @@ check("Suelto sobre sucias: N espigas", p3 == N, f"{p3}/{N}")
 check("Suelto sobre sucias: agujeros reales en A", abs(na3.volume) < 100**3 - 100)
 check("Suelto sobre sucias: agujeros reales en B", abs(nb3.volume) < 100**3 - 100)
 
-# ---------- 2c. REPARACIÓN PROFUNDA con boquete real (perfil Buddha) ----------
+# ---------- 2c. Límite documentado del saneado interno ----------
 sph = trimesh.creation.icosphere(subdivisions=4, radius=50)
 holed = trimesh.Trimesh(vertices=sph.vertices, faces=sph.faces[200:], process=False)
 check("Setup: boquete real no-volumen", not holed.is_volume)
-check("manifold_repair NO puede con boquetes", ms.manifold_repair(holed) is None)
-try:
-    import pymeshfix  # noqa: F401
-    HAS_MESHFIX = True
-except ImportError:
-    HAS_MESHFIX = False
-if HAS_MESHFIX:
-    repd, method = ms.deep_repair(holed)
-    check("deep_repair cierra el boquete (MeshFix)", repd is not None and repd.is_volume,
-          f"método={method}")
-    check("deep_repair: volumen ~esfera", repd is not None and
-          abs(abs(repd.volume)/1000 - 523.6) < 15, f"{abs(repd.volume)/1000:.1f} cm3")
-else:
-    print("[SKIP] pymeshfix no instalado: deep_repair con boquetes no validable aquí")
-
-# ---------- 2d. KITBASH: multi-componente NO se descarta (caso real) ----------
-if HAS_MESHFIX:
-    s1 = trimesh.creation.icosphere(subdivisions=3, radius=50)            # "cuerpo"
-    s2 = trimesh.creation.icosphere(subdivisions=3, radius=30)            # "cabeza"
-    s2.apply_translation([0, 0, 60])                                       # solapadas
-    holed1 = trimesh.Trimesh(vertices=s1.vertices, faces=s1.faces[60:], process=False)
-    soup2 = trimesh.Trimesh(vertices=s2.triangles.reshape(-1, 3),
-                            faces=np.arange(len(s2.faces)*3).reshape(-1, 3), process=False)
-    kitbash = trimesh.util.concatenate([holed1, soup2])
-    check("Setup kitbash: 2 componentes, no-volumen",
-          kitbash.body_count >= 2 and not kitbash.is_volume)
-    v_cuerpo = 4/3*np.pi*50**3 / 1000   # 523.6 cm3
-    rk, mk = ms.deep_repair(kitbash)
-    check("Kitbash: reparado", rk is not None, f"método: {mk}")
-    if rk is not None:
-        print(f"[i ] Kitbash: body_count={rk.body_count} (1=soldado; >1=compuesto válido), is_volume={rk.is_volume}")
-    check("Kitbash: resultado es volumen operable", rk is not None and rk.is_volume)
-    check("Kitbash: el cuerpo NO se descartó", rk is not None and
-          abs(rk.volume)/1000 > v_cuerpo,
-          f"{abs(rk.volume)/1000:.0f} cm3 > cuerpo solo {v_cuerpo:.0f} cm3")
-else:
-    print("[SKIP] kitbash requiere pymeshfix")
+check("Saneado interno NO repara boquetes (por diseño: reparar es del slicer)",
+      ms.manifold_repair(holed) is None)
 
 # ---------- 3. Espigas adheridas siguen funcionando (regresión) ----------
 A2 = trimesh.creation.box(extents=[100, 100, 100]); A2.apply_translation([0, 0, 50])
