@@ -1,0 +1,77 @@
+name: Build releases
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install -r requirements.txt pyinstaller
+      - name: Engine tests
+        run: |
+          python tests/test_engine.py
+          python tests/test_fixes.py
+          python tests/test_triplicado.py
+      - name: GUI smoke test (offscreen)
+        run: python tests/smoke_gui.py
+      - name: Build .app
+        run: pyinstaller MeshSplitter.spec --noconfirm
+      - name: Make DMG
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          hdiutil create -volname MeshSplitter -srcfolder dist/MeshSplitter.app -ov -format UDZO "dist/MeshSplitter-${VERSION}-macOS.dmg"
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MeshSplitter-macOS
+          path: dist/*.dmg
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.dmg
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install -r requirements.txt pyinstaller
+      - name: Engine tests
+        run: |
+          python tests/test_engine.py
+          python tests/test_fixes.py
+          python tests/test_triplicado.py
+      - name: GUI smoke test (offscreen)
+        run: python tests/smoke_gui.py
+      - name: Build portable .exe
+        run: pyinstaller MeshSplitter.spec --noconfirm
+      - name: Rename exe with version
+        shell: pwsh
+        run: |
+          $v = "$env:GITHUB_REF_NAME".TrimStart("v")
+          Move-Item dist/MeshSplitter.exe "dist/MeshSplitter-$v-Windows-portable.exe"
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MeshSplitter-Windows
+          path: dist/*.exe
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.exe

@@ -1,0 +1,18 @@
+# entornos y caches de Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# builds de PyInstaller
+build/
+dist/
+*.dmg
+*.exe
+
+# macOS
+.DS_Store
+
+# modelos y salidas de prueba (pesados)
+*.stl
+*_informe.txt
